@@ -1,0 +1,56 @@
+---
+title: "Creating-Master-Index"
+author: "Eric He"
+date: "August 4, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library("edgar")
+library("dplyr")
+```
+
+```{r}
+getMasterIndex(c(2013, 2014, 2015, 2016)
+```
+
+```{r}
+load("Master Index/2013master.Rda")
+index.2013 <- year.master
+index.2013 <- filter(index.2013, FORM_TYPE == "10-K")
+load("Master Index/2014master.Rda")
+index.2014 <- year.master
+index.2014 <- filter(index.2014, FORM_TYPE == "10-K")
+load("Master Index/2015master.Rda")
+index.2015 <- year.master
+index.2015 <- filter(index.2015, FORM_TYPE == "10-K")
+load("Master Index/2016master.Rda")
+index.2016 <- year.master
+index.2016 <- filter(index.2016, FORM_TYPE == "10-K")
+rm(year.master)
+index <- rbind(index.2013, index.2014, index.2015, index.2016)
+rm(index.2013, index.2014, index.2015, index.2016)
+```
+
+We have the text data needed to begin our analysis; however, we want to be able to access the financial data corresponding to the companies we are analyzing. This is done by linking the CIK values given by the SEC for companies to their stock tickers. The CIK-ticker mapping was downloaded from https://www.valuespreadsheet.com/iedgar/, and lists every publicly traded company's CIK, ticker, SIC code (which denotes the industry the company is classified as being in), and the exchange where that company's stock trades.
+
+```{r}
+tickers <- "cik-ticker.csv" %>%
+  read.csv() %>%
+  rename(TICKER = ticker, CIK = cik, SIC = sic, EXCHANGE = exchange, HITS = hits)
+```
+
+Let's join the two datasets together.
+
+```{r}
+index <- left_join(index, tickers, by = "CIK") %>%
+  select(-name)
+```
+
+```{r}
+write.csv(index, "masterIndex.csv")
+```

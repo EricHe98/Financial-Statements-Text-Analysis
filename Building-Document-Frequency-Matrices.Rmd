@@ -1,0 +1,130 @@
+---
+title: "CorpusCreation"
+author: "Eric He"
+date: "July 17, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+This document details the process for taking the cleaned financial statements and parsing them into quanteda corpuses. The code is done for all the financial statements for a given year, and is repeated for each of the four years.
+
+We begin by loading in the required libraries.
+
+```{r}
+library("quanteda")
+library("stringr")
+library("dplyr")
+library("purrr")
+```
+
+The first 6033 filings are filed in the year 2013, while filings in year 2014 range from 6034 to 11882. This can be recomputed by looking at the masterIndex in the folder.
+
+```{r}
+year2013 <- c(1:6033)
+year2014 <- c(6034:11882)
+year2015 <- c(11883:17467)
+year2016 <- c(17468:22631)
+StopWordsList <- "StopWordsList.txt" %>%
+  readLines() %>%
+  str_split(pattern = " ")
+```
+
+In this code, each financial statement for a given year is loaded in one by one. The filing is split into its component sections, and each section becomes a document that is added to the corpus. That is to say, each row of the corpus corresponds to one of the 20 sections of a financial statement. Each financial statement should add 20 sections to the corpus. Unfortunately, the cleaning algorithm which tagged these sections within the financial statement is not perfect, and many false positives must be dealt with. False negatives are at this point impossible to catch, which is why the tagging procedure of the cleaning algorithm has been designed to be more liberal with its tagging.
+
+```{r}
+years <- year2013 # replace year here
+bigcorpus <- corpus("")
+for (i in years){
+  text <- paste("parsed/", i, ".txt", sep = "") %>%
+    readLines() %>%
+    str_split(pattern = "(?s)(?i)°Item", simplify = TRUE) %>%
+    str_replace_all(pattern = "(?s)<.*?>", replacement = "") %>%
+    str_replace_all(pattern = "(?s) +", replacement = " ")
+  text <- text[text != ""]
+  names(text) <- paste(i, str_extract(text, pattern = "[1234567890ABC]+"))
+  text <- corpus(text)
+  bigcorpus <- bigcorpus + text
+  rm(text)
+  print(i)
+}
+save(bigcorpus, file = "RawCorpus2016.RData")
+```
+
+The bigcorpus object holds every identified section of every financial statement in the given year as a document. However, most of these documents are garbage! Many documents are actually snippets of the Table of Contents of various filings, which were mistakenly tagged by the cleaning algorithm as section texts. Unfortunately, the heterogeneity of filings makes this incorrect tagging difficult to avoid. Additionally, some documents are simply excerpts of other sections that are simply mistagged.
+
+Thus, the goal of the code below is to weed out these documents which are not desired. A good way to delete the documents which are actually part of the Table of Contents is to remove any document with less than 100 words. These documents are both likely to be not real sections, or contain only boiler plate language when the section is not relevant to the company (e.g. Mine Disclosures for a fast food company; the fast food company owns no mines!). At any rate, having less than 100 words is not very useful for our text analysis.
+
+```{r}
+# sufficient word count
+#wordcount <- ntoken(bigcorpus)
+#load("wordcount2014.RData")
+enoughWords <- wordcount < 100
+
+# is not section
+names <- docnames(bigcorpus)
+real.section.letter <- !is.na(str_extract(names, pattern = "[1234567890]+ [ABCDEFGHIJKLMNOPQRSTUVWXYZ]"))
+
+# is duplicate
+real.section.toc <- !is.na((str_extract(names, pattern = "\\.")))
+index.numbers <- unique(str_extract(names[real.section.toc], pattern = "[1234567890]+ "))
+all.names <- str_extract(names, pattern = "[0-9]+ ")
+has.duplicates <- is.element(all.names, index.numbers)
+real.section.duplicate <- !real.section.toc + has.duplicates > 1
+
+#filter out all trash
+the.trash <- real.section.duplicate + real.section.letter + enoughWords > 0
+
+docvars(bigcorpus, "Subset") <- the.trash
+bigcorpus <- corpus_subset(bigcorpus, subset = Subset == FALSE, select = FALSE)
+```
+
+Here, we extract relevant information from the remaining documents. The data of interest is as follows:
+
+1) The section the document is of.
+2) The filing the document belongs to.
+3) The date during which the financial statement was filed with the SEC.
+4) The index number of the section within its new, subsetted corpus.
+5) The number of words in the filing.
+
+```{r}
+#remove the duplicate names
+names[real.section.toc] <- names[real.section.toc] %>%
+  str_extract(pattern = ".*(?=\\.)")
+subsetted.names <- names[the.trash == FALSE]
+#extract section of filing
+section <- subsetted.names %>%
+  str_extract(pattern = "(?<= ).*") %>%
+  as.factor()
+#extract filing of section
+filing <- subsetted.names %>%
+  str_extract(pattern = ".*(?= )")
+#extract date during which 10-k was filed
+date.filed <- masterIndex$DATE_FILED[as.numeric(filing)]
+#extract word count
+word.count <- wordcount[the.trash == FALSE]
+#combine into meta dataframe
+metadata <- data_frame(index = 1:ndoc(bigcorpus), subsetted.names, section, filing, date.filed, word.count)
+
+#remove the clutter
+rm(real.section.duplicate, has.duplicates, all.names, index.numbers, real.section.toc, real.section.letter, wordcount, names, date.filed, word.count, subsetted.names, section, filing, the.trash, enoughWords)
+```
+
+The meta datafrane is saved for future analysis.
+
+```{r}
+save(metadata, file = "metadata2015.RData")
+write.csv(metadata, file = "metadata2015.csv")
+```
+
+It is at this stage that we create a document-frequency matrix (DFM) of the various documents. Each row of the DFM corresponds to a different section, while each column corresponds to a different word which appeared in any of the various documents. Cell i,j corresponds to the count of word j in document i. Punctuation and numbers are removed and do not appear in the DFM, since they are not actually words.
+
+```{r}
+bigdfm <- dfm(bigcorpus, remove = StopWordsList, remove_punct = TRUE, remove_numbers = TRUE)
+```
+
+```{r}
+save(bigcorpus, file = "parsedCorpus2016.RData")
+```

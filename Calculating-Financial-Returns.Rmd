@@ -1,0 +1,58 @@
+---
+title: "FinancialReturns"
+author: "Eric He"
+date: "July 17, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+http://blog.revolutionanalytics.com/2013/12/quantitative-finance-applications-in-r.html
+
+```{r}
+library("quantmod")
+library("dplyr")
+library("lubridate")
+library("tidyr")
+```
+
+Load in the data.
+
+```{r}
+tickers <- readLines("tickers.txt")
+full_returns <- read.csv("financialreturns.csv")
+full_returns <- data.frame(index = c(1:nrow(full_returns)), full_returns)
+ls(full_returns)
+```
+
+Select the relevant columns: holding period returns (RET), tickers (TICKER), company name (COMNAM), delisting return (DLRET), Shares Observation End Date (shrenddt)
+
+End product: correct monthly returns
+
+```{r}
+hpr <- select(full_returns, index = index, date = date, return = RET, ticker = TICKER, company_name = COMNAM, delisting_return = DLRET, end = SHRENDDT) %>%
+  filter(ticker %in% tickers) %>%
+  mutate(delisting_return = as.numeric(as.character(delisting_return))) %>%
+  mutate(delisting_return = replace(hpr$delisting_return, is.na(delisting_return) == TRUE, 0)) %>%
+  mutate(delisting_return = delisting_return + 1) %>%
+  mutate(return = as.numeric(as.character(return)) + 1) %>%
+  filter(is.na(return) == FALSE) %>%
+  mutate(return = return * delisting_return) %>%
+  mutate(year = year(mdy(date)))
+```
+
+Calculate returns and arrange them by year.
+
+```{r}
+hpr1 <- group_by(hpr, ticker, year) %>%
+  summarise(cumulative_return = prod(return)) %>%
+  spread(year, cumulative_return)
+```
+
+Save hpr1
+
+```{r}
+write.csv(hpr1, "annualReturns.csv", row.names = FALSE)
+```

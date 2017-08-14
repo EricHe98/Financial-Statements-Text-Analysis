@@ -1,0 +1,28 @@
+---
+title: "Making the Dictionary"
+author: "Eric He"
+date: "June 16, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library("dplyr")
+dictionary <- read.csv("masterDictionary.csv")
+```
+
+We follow the exact specifications laid out by Luo. Positive and Interesting words from the dictionary are classified as Positive, while Negative, Uncertain, Litigious, Constraining, and Superfluous all are collapsed under the umbrella classification "Negative".
+
+```{r}
+positive <- dictionary %>%
+  filter(Positive > 0 | Interesting > 0) %>%
+  select(ï..Word)
+negative <- dictionary %>%
+  filter(Negative > 0 | Uncertainty > 0 | Litigious > 0 | Constraining > 0 | Superfluous > 0) %>%
+  select(ï..Word)
+write.csv(negative, row.names= FALSE, file = "negative.csv")
+write.csv(positive, row.names = FALSE, file = "positive.csv")
+```
