@@ -123,7 +123,7 @@ It is at this stage that we create a document-frequency matrix (DFM) of the vari
 
 ```{r}
 bigdfm <- dfm(bigcorpus, remove = StopWordsList, remove_punct = TRUE, remove_numbers = TRUE) %>%
-  tfidf(scheme_df="logave")
+  tfidf(scheme_tf="logave")
 ```
 
 ```{r}
