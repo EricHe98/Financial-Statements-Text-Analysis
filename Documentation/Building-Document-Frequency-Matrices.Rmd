@@ -112,7 +112,7 @@ metadata <- data_frame(index = 1:ndoc(bigcorpus), subsetted.names, section, fili
 rm(real.section.duplicate, has.duplicates, all.names, index.numbers, real.section.toc, real.section.letter, wordcount, names, date.filed, word.count, subsetted.names, section, filing, the.trash, enoughWords)
 ```
 
-The meta datafrane is saved for future analysis.
+The meta dataframe is saved for future analysis.
 
 ```{r}
 save(metadata, file = "metadata2015.RData")
@@ -122,7 +122,8 @@ write.csv(metadata, file = "metadata2015.csv")
 It is at this stage that we create a document-frequency matrix (DFM) of the various documents. Each row of the DFM corresponds to a different section, while each column corresponds to a different word which appeared in any of the various documents. Cell i,j corresponds to the count of word j in document i. Punctuation and numbers are removed and do not appear in the DFM, since they are not actually words.
 
 ```{r}
-bigdfm <- dfm(bigcorpus, remove = StopWordsList, remove_punct = TRUE, remove_numbers = TRUE)
+bigdfm <- dfm(bigcorpus, remove = StopWordsList, remove_punct = TRUE, remove_numbers = TRUE) %>%
+  tfidf(scheme_df="logave")
 ```
 
 ```{r}
