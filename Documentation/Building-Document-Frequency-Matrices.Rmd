@@ -53,7 +53,7 @@ for (i in years){
 save(bigcorpus, file = "RawCorpus2016.RData")
 ```
 
-The bigcorpus object holds every identified section of every financial statement in the given year as a document. However, most of these documents are garbage! Many documents are actually snippets of the Table of Contents of various filings, which were mistakenly tagged by the cleaning algorithm as section texts. Unfortunately, the heterogeneity of filings makes this incorrect tagging difficult to avoid. Additionally, some documents are simply excerpts of other sections that are simply mistagged.
+The bigcorpus object holds every identified section of every financial statement in the given year as a document. However, most of these documents are garbage! Many documents are actually snippets of the Table of Contents of various filings, which were mistakenly tagged by the cleaning algorithm as section texts. Unfortunately, the heterogeneity of filings makes this incorrect tagging difficult to avoid. Additionally, some documents are simply excerpts of other sections that are mistagged.
 
 Thus, the goal of the code below is to weed out these documents which are not desired. A good way to delete the documents which are actually part of the Table of Contents is to remove any document with less than 100 words. These documents are both likely to be not real sections, or contain only boiler plate language when the section is not relevant to the company (e.g. Mine Disclosures for a fast food company; the fast food company owns no mines!). At any rate, having less than 100 words is not very useful for our text analysis.
 

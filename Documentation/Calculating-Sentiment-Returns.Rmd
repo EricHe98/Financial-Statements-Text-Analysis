@@ -1,0 +1,177 @@
+---
+title: "sentimentAnalysisAlgo"
+author: "Eric He"
+date: "August 7, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library("quanteda")
+library("dplyr")
+library("purrr")
+library("ggplot2")
+library("reshape2")
+library("gridExtra")
+```
+
+Read in the data relevant for all four years.
+
+```{r}
+negative <- readLines("negative.txt")
+positive <- readLines("positive.txt")
+sections <- c("1", "1A", "1B", "2", "3", "4", "5", "6", "7", "7A", "8", "9", "9A", "9B", "10", "11", "12", "13", "14", "15")
+hpr <- read.csv("annualReturns.csv", na.strings = "NA")
+years <- c("X2012", "X2013", "X2014", "X2015", "X2016")
+years <- c(2013, 2014, 2015, 2016)
+masterIndex <- read.csv("masterIndex.csv")
+tickers <- data_frame(filing = c(1:nrow(masterIndex)), ticker = masterIndex$TICKER)
+```
+
+Build two functions, one which subsets the bigdfm according to section and the other recording the indices if the subsetted.
+
+```{r}
+indices_tfidf <- function(meta_df, cond){
+  index_num <- filter(meta_df, section == cond) %>%
+    select(filing)
+  return(index_num)
+}
+subset_tfidf <- function(meta_df, dfmobj, cond){
+  index_num <- filter(meta_df, section == cond) %>%
+    select(index)
+  weightsdfm <- dfmobj[index_num$index,] %>%
+    tfidf(scheme_tf = "logave")
+  return(weightsdfm)
+}
+```
+
+Build a function which computes the sentiment scores. Recall that the sentiment score is the weights of the words in the sentiment dictionary, divided by the total weight of the words in the document.
+
+```{r}
+dfmstat_ratio <- function(dfmObj, dict){
+  dfm_select(dfmObj, features = dict) %>%
+    rowSums(.) / rowSums(dfmObj)
+}
+```
+
+We would like to do the algorithm for the positive, negative, positive-negative sentiment scorings. This requires the positive and negative dictionaries.
+Then we would like to do them for all four years. 
+
+```{r}
+indices_list <- map(sections, indices_tfidf, meta_df = metadata)
+weightsdfm_list <- map(sections, subset_tfidf, meta_df = metadata, dfmobj = bigdfm)
+sentiment_list <- weightsdfm_list %>%
+  map(dfmstat_ratio, dict = negative)
+```
+
+Now do this for every year's worth of data.
+
+```{r}
+years <- c(2013:2016)
+path_to_metadata <- "metadata"
+metadata_type <- ".csv"
+path_to_parsedDFM <- "parsedBigDfm"
+parsedDFM_type <- ".RData"
+
+weighter <- function(year){
+metadata <- paste(path_to_metadata, year, metadata_type, sep = "") %>%
+  read.csv()
+load(paste(path_to_parsedDFM, year, parsedDFM_type, sep = ""))
+
+indices_list <- map(sections, indices_tfidf, meta_df = metadata)
+weightsdfm_list <- map(sections, subset_tfidf, meta_df = metadata, dfmobj = bigdfm)
+
+save(indices_list, file = paste("indices_list_", year, ".RData", sep = ""))
+save(weightsdfm_list, file = paste("weightsdfm_list_", year, ".RData", sep = ""))
+}
+
+map(years, weighter) # The weighter function returns nothing which is fine.
+```
+
+Get every sentiment list for every year.
+
+```{r}
+years <- c(2013:2016)
+path_to_weightsdfm_list <- "weightsdfm_list_"
+weightsdfm_list_type <- ".RData"
+path_to_indices_list <- "indices_list_"
+indices_list_type <- ".RData"
+
+returns_quantiler <- function(sentiment_list, index_list, return_df, n_quantiles){
+  sentiment_list %>%
+  map(ntile, n = n_quantiles) %>%
+  map(as.factor) %>%
+  map(~ data_frame("quantile" = .)) %>%
+  map2(index_list, cbind) %>%
+  map(left_join, y = tickers, by = "filing") %>%
+  map(left_join, y = return_df, by = "ticker") %>%
+  map(group_by, quantile) %>%
+  map(summarise, average_return = mean(return, na.rm = TRUE)) %>%
+  map(transmute, relative_return = average_return / min(average_return) - 1) %>% # quantile 1 is row 1, 2 is row 2, etc. Higher quantile means higher sentiment value.
+  do.call(what = cbind)
+}
+
+sentiment_returns_algo <- function(year, sentiment_dict){
+load(paste(path_to_weightsdfm_list, year, weightsdfm_list_type, sep = "")) # loads into global
+load(paste(path_to_indices_list, year, indices_list_type, sep = "")) # loads into global
+return_df <- select(hpr, ticker, return = paste("X", year, sep="")) # creates in function namespace so MUST be specified in returns_by_quantile function which would otherwise look in global for return_df
+sentiment_list <- weightsdfm_list %>%
+  map(dfmstat_ratio, dict = sentiment_dict)
+returns_by_quantile <- returns_quantiler(sentiment_list, index_list = indices_list, return_df = return_df, n_quantiles = 5)
+names(returns_by_quantile) <- paste("section", sections, sep = "")
+return(returns_by_quantile)
+}
+
+negative_returns_by_quantile <- map(years, sentiment_returns_algo, sentiment_dict = negative) %>%
+  reduce(`+`) / length(years) # require hpr, sections, masterIndex, tickers, dfmstat_ratio
+
+positive_returns_by_quantile <- map(years, sentiment_returns_algo, sentiment_dict = positive) %>%
+  reduce(`+`) / length(years)
+```
+
+Make the ggplot graph.
+
+```{r}
+quantile <- c(1:5) # little hacky but we need x to be the five quantiles; a proper melt would be the correct method, I think, but i cant get it to work. The problem is that this relies on the ggplot mapping 1 to quantile 1, 2 to quantile 2, etc. which works for c(1:5) but does not work for c("one", "two", "three", "four", "five"), for example, which will sort the character vector alphabetically
+
+nm <- names(negative_returns_by_quantile)
+negative_sentiment_quantile_returns <- map(nm, ~ ggplot(data = negative_returns_by_quantile, aes_string(x = quantile, y = .)) +
+      geom_bar(stat = "identity") +
+      theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank())) %>%
+  arrangeGrob(grobs = ., ncol = 5)
+ggsave(negative_sentiment_quantile_returns, file = "negative_sentiment_quantile_returns.png")
+
+nm <- names(positive_returns_by_quantile)
+positive_sentiment_quantile_returns <- map(nm, ~ ggplot(data = positive_returns_by_quantile, aes_string(x = quantile, y = .)) +
+      geom_bar(stat = "identity") +
+      theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank())) %>%
+  arrangeGrob(grobs = ., ncol = 5)
+ggsave(positive_sentiment_quantile_returns, file = "positive_sentiment_quantile_returns.png")
+```
+
+
+```{r}
+returns_by_quantile <- sentiment_list %>%
+  map(ntile, n = 5) %>%
+  map(as.factor) %>%
+  map(~ data_frame("quantile" = .)) %>%
+  map2(indices_list, cbind) %>%
+  map(left_join, y = tickers, by = "filing") %>%
+  map(left_join, y = return_df, by = "ticker") %>%
+  map(group_by, quantile) %>%
+  map(summarise, average_return = mean(return, na.rm = TRUE)) %>%
+  map(transmute, relative_return = average_return / min(average_return) - 1) %>%
+  do.call(what = cbind)
+names(returns_by_quantile) <- rep(paste("section", sections))
+
+quantiles <- map2(indices_list, quantile_negative, cbind)
+returns_by_quantile <- map(quantiles, group_by, return) %>%
+  map(summarise, average_return = mean(X2012, na.rm = TRUE))
+```

@@ -1,0 +1,146 @@
+---
+title: "TextDistanceAlgo"
+author: "Eric He"
+date: "August 19, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library("quanteda")
+library("dplyr")
+library("purrr")
+library("stringr")
+library("readtext")
+library("reshape2")
+```
+
+```{r}
+masterIndex <- read.csv("masterIndex.csv")
+tickers <- readLines("tickers.txt") # use unique(masterIndex) if we wish to scale this across multiple years, or keep tickers.txt updated
+StopWordsList <- readLines("StopWordsList.txt")
+hpr <- read.csv("annualReturns.csv", na.strings = "NA")
+sections <- c("1", "1A", "3", "4", "7", "8", "9", "9A")
+```
+
+```{r}
+# 1 statement, 1 section
+section_extractor <- function(statement, section){
+  name <- statement$doc_id # needs to be atomic vector
+  pattern <- paste0("°Item ", section, ".*?°")
+  # needs simplify=TRUE because FALSE returns 1-element list of multiple vectors which map() cannot handle. May file issue with stringr
+  section_hits <- str_extract_all(statement, pattern, simplify=TRUE) 
+  #if section_hits is empty then we need function to skip this one
+  if (is_empty(section_hits) == TRUE){
+    return("empty")
+  }
+  word_counts <- map_int(section_hits, ntoken)
+  max_filing <- section_hits[[which(word_counts == max(word_counts))]] # select the "filing" with the largest word count
+ names(max_filing) <- paste(name, section, sep = "_") 
+  return(max_filing)
+}
+
+# multiple statements, 1 section
+section_dfm <- function(statements_list, section, min_words, tfidf){
+    map(statements_list, section_extractor, section=section) %>%
+    map(corpus) %>%
+    reduce(`+`) %>%
+    dfm(tolower=TRUE, remove=StopWordsList, remove_punct=TRUE) %>% 
+    dfm_subset(., rowSums(.) > min_words) %>%
+    when(tfidf==TRUE ~ tfidf(., scheme_tf="logave"), 
+         ~ .)
+}
+# the when statement looks like black magic but it is the functional version of an if-else statement.
+# syntax denoted by formula (~) object, LHS of ~ is the condition, RHS is the return.
+# If tfidf (the tfidf parameter) == TRUE then return tfidf(., scheme_tf="logave") (the tfidf function)
+# Else (no condition) then return . (return the input as the output (do nothing))
+
+# multiple statements, multiple sections, 1 ticker. No reduce() since each filing section needs its own corpus
+filing_dfm <- function(sections, filings_list, min_words){
+  map(sections, section_dfm, statements_list=filings_list, min_words=min_words)
+}
+
+# perform distance analysis on the processed dfm_list
+dist_parser <- function(distObj){
+  as.matrix(distObj) %>%
+    melt(varnames = c("row", "col")) %>%
+    filter(as.numeric(row) == as.numeric(col) + 1) %>% # pretty dangerous since factor levels are not necessarily in order
+    pull(value) 
+}
+
+filing_similarity <- function(dfm_list, method){
+  map(dfm_list, textstat_simil, method=method) %>%
+  map(dist_parser)}
+```
+
+Do 1 ticker end to end.
+
+```{r}
+index_filing_filterer <- function(ticker, index){
+  filter(index, TICKER == ticker) %>%
+    pull(filing) # pull the file name, which in this case is just the filing number
+}
+index_year_filterer <- function(ticker, index){
+  filter(index, TICKER == ticker) %>%
+    pull(YEAR)
+}
+
+file_path <- "parsed/"
+file_type <- ".txt"
+
+the_ticker <- "AAPL"
+
+file_names <- index_filing_filterer(the_ticker, masterIndex)
+file_years <- index_year_filterer(the_ticker, masterIndex)
+
+file_locations <- paste0(file_path, file_names, file_type)
+
+filings_list <- map(file_locations, readtext)
+
+years <- paste0("X", file_years[-1]) # chop out the first year
+returns_vector <- filter(hpr, ticker == the_ticker) %>% # calling the_ticker ticker gives rise to namespace issues
+  select(years) %>%
+  t() %>%
+  as.vector() # requires there to be only 1 row before transpose. thus tickers cannot be repeated
+
+similarity_vector <- filing_dfm(sections=sections, filings_list=filings_list) %>%
+  filing_similarity("cosine") # jaccard distance is not supposed to use tfidf weightings
+
+distance_returns_df <- similarity_vector %>%
+  map(~ data_frame(distance=., returns=returns_vector))
+```
+https://janav.wordpress.com/2013/10/27/tf-idf-and-cosine-similarity/
+Do all tickers.
+
+TODO: store the indices of the sections which got thrown out for having insufficient word counts as we have to prevent them from joining with financial data.
+
+TODO: swap out tfidf() with tf() + docfreq(K, smooth).
+
+```{r}
+distance_returns_calculator <- function(ticker){
+file_names <- index_filing_filterer(ticker, masterIndex)
+file_years <- index_year_filterer(ticker, masterIndex)
+
+file_locations <- paste0(file_path, file_names, file_type)
+
+filings_list <- map(file_locations, readtext)
+
+years <- paste0("X", file_years[-1]) # chop out the first year
+returns_vector <- filter(hpr, ticker == ticker) %>%
+  select(years) %>%
+  t() %>%
+  as.vector() # requires there to be only 1 row before transpose. thus tickers cannot be repeated
+
+similarity_vector <- filing_dfm(sections=sections, filings_list=filings_list, min_words=min_words) %>%
+  filings_similarity
+
+distance_returns_df <- data_frame(distance = similarity_vector, returns = returns_vector)
+return(distance_returns_df)
+}
+
+distance_returns_df <- map(tickers, distance_returns_calculator) %>%
+  reduce(rbind) # test if this works
+```
