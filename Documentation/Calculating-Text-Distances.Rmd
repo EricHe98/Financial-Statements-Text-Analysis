@@ -100,7 +100,7 @@ index_year_filterer <- function(ticker, index){
 file_path <- "parsed/"
 file_type <- ".txt"
 
-the_ticker <- "PTIX"
+the_ticker <- "AAPL"
 
 file_names <- index_filing_filterer(the_ticker, masterIndex)
 file_years <- index_year_filterer(the_ticker, masterIndex)
@@ -121,7 +121,7 @@ similarity_list <- filing_dfm(sections=sections, filings_list=filings_list, min_
   filing_similarity("cosine") # jaccard distance doesnt need any term weightings, although tf=TRUE doesnt make any difference
 # similarity_list[map_dbl(similarity_list, nrow) == 0] <- NULL # not needed as we rbind
 
-distance_returns_df <- similarity_list %>% # MOVE THE FILTERING HERE, MORE FLEXIBLE THIS WAY
+distance_returns_df2 <- similarity_list %>% # MOVE THE FILTERING HERE, MORE FLEXIBLE THIS WAY
   map(right_join, returns_df)
   #map(~ data_frame(distance=., returns=returns_vector))
 ```
@@ -140,16 +140,23 @@ filing     CIK     COMPANY_NAME FORM_TYPE DATE_FILED                            
 
 If there is only one year of data (e.g. PTIX) then lagging is rip. 
 
+No financial returns data for 2033 of the tickers...F WRDS
+
+```{r}
+tickers %in% hpr$ticker %>% table
+```
+
 ```{r}
 file_path <- "parsed/"
 file_type <- ".txt"
 
-distance_returns_calculator <- function(ticker){
-file_names <- index_filing_filterer(ticker, masterIndex)
-file_years <- index_year_filterer(ticker, masterIndex)
+distance_returns_calculator <- function(the_ticker){
+file_names <- index_filing_filterer(the_ticker, masterIndex)
+file_years <- index_year_filterer(the_ticker, masterIndex)
 
 if (length(file_names) <= 1 | length(file_years) <= 1){
   empty_list <- map(rep(NA, times = length(sections)), ~data_frame(previous_filing = ., current_filing = ., distance = ., returns = .))
+  print(paste("Only one year of data for ticker", the_ticker))
   return(empty_list)
 } # companies with only one year of data cannot be used for a distance analysis. We return a data frame of NAs so that the rbind() can be smooth
 
@@ -161,6 +168,12 @@ years <- paste0("X", file_years[-1]) # chop out the first year
 returns_df <- filter(hpr, ticker == the_ticker) %>% # calling the_ticker ticker gives rise to namespace issues
   select(years) %>% 
   t() 
+if (is_empty(returns_df) == TRUE){
+  empty_list <- map(rep(NA, times = length(sections)), ~data_frame(previous_filing = ., current_filing = ., distance = ., returns = .))
+  print(paste("No financial data for ticker", the_ticker))
+  return(empty_list)
+}
+
 colnames(returns_df) <- "returns"
 returns_df %<>% cbind(previous_filing = file_names[-length(file_names)], current_filing = file_names[-1], .) %>% # assumes no broken years in the data; broken years can occur if there is no financial filing located one year, or financial data no existerino for a year. Obviously this occurring would be very nonstandard
   as.data.frame(stringsAsFactors = FALSE)
@@ -170,7 +183,7 @@ similarity_list <- filing_dfm(sections=sections, filings_list=filings_list, min_
 
 distance_returns_df <- similarity_list %>%
   map(right_join, returns_df, by = c("previous_filing", "current_filing"))
-print(ticker)
+print(paste("Successfully mapped distance scores to financial returns for ticker", the_ticker))
 return(distance_returns_df)
 }
 
