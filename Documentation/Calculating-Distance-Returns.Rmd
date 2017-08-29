@@ -150,22 +150,9 @@ distance_returns_df2 <- similarity_list %>% # MOVE THE FILTERING HERE, MORE FLEX
   map(right_join, returns_df)
   #map(~ data_frame(distance=., returns=returns_vector))
 ```
-https://janav.wordpress.com/2013/10/27/tf-idf-and-cosine-similarity/
 Do all tickers.
 
-TODO: store the indices of the sections which got thrown out for having insufficient word counts as we have to prevent them from joining with financial data.
-
-Some throw warnings because their filing schedule is shit
-filing     CIK     COMPANY_NAME FORM_TYPE DATE_FILED                                  EDGAR_LINK QUARTER TICKER  SIC EXCHANGE HITS
-1     13 1001258 ASTA FUNDING INC      10-K 2013-01-18 edgar/data/1001258/0001193125-13-017517.txt       1   ASFI 6153   NASDAQ    1
-2   5551 1001258 ASTA FUNDING INC      10-K 2013-12-13 edgar/data/1001258/0001193125-13-473407.txt       4   ASFI 6153   NASDAQ    1
-3  15921 1001258 ASTA FUNDING INC      10-K 2015-06-29 edgar/data/1001258/0001193125-15-239517.txt       2   ASFI 6153   NASDAQ    1
-4  17077 1001258 ASTA FUNDING INC      10-K 2015-12-14 edgar/data/1001258/0001193125-15-402698.txt       4   ASFI 6153   NASDAQ    1
-5  22262 1001258 ASTA FUNDING INC      10-K 2016-12-14 edgar/data/1001258/0001437749-16-043365.txt       4   ASFI 6153   NASDAQ    1
-
-If there is only one year of data (e.g. PTIX) then lagging is rip. 
-
-No financial returns data for 2033 of the tickers...F WRDS
+No financial returns data for 2033 of the tickers.
 
 ```{r}
 tickers %in% hpr$ticker %>% table
