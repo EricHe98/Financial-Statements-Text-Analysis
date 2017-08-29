@@ -74,14 +74,18 @@ start_date <- ymd("20131030")
 
 end_date <- the_date %m+% months(3)
 
-returns_calculator <- function(the_ticker, start_date, interval_length = 3, interval_type = "day"){
-  end_date <- start_date %>%
+returns_calculator <- function(the_ticker, filing_date, interval_length = 5, interval_type = "day"){
+  start_date_beginning <- filing_date %>% # start date is first non-weekend day before the filing date.
+    ymd(.) %m-% days(3)
+  start_date_candidates <- seq(start_date_beginning, ymd(filing_date) %m-% days(1), by = "days")
+  start_date <- start_date_candidates[which(format(start_date_candidates, "%u") %in% c(1:5))[length(which(format(start_date_candidates, "%u") %in% c(1:5)))]] # pick out first weekday in the sequence, %u formats date object into numeric weekday
+  end_date <- filing_date %>%
     ymd %>% # have to ram through ymd again because map() uses [[]] which messes with lubridate object type
     when(interval_type == "day" ~ . %m+% days(interval_length),
-         interval_type == "month" ~ . %m+% months(interval_length),
+         interval_type == "month" ~ . %m+% months(interval_length), 
          interval_type == "year" ~ . %m+% years(interval_length),
          ~ stop(print(interval_type)))
-  date_sequence <- seq(ymd(start_date), end_date, by = "days") # see above comment
+  date_sequence <- seq(start_date, end_date, by = "days") # see above comment
   date_returns <- filter(full_returns, as.character(ticker) == as.character(the_ticker), date %in% date_sequence) # tickers must be converted to character or else throws a factor level error
   if (nrow(date_returns) == 0){
     empty_df <- data_frame(hpr = NA)
@@ -92,9 +96,7 @@ returns_calculator <- function(the_ticker, start_date, interval_length = 3, inte
 ```
 
 ```{r}
-returns_3_days <- map2_df(masterIndex$TICKER, masterIndex$DATE_FILED, returns_calculator)
-returns_7_days <- map2_df(masterIndex$TICKER, masterIndex$DATE_FILED, returns_calculator, interval_length = 7)
-returns_14_days <- map2_df(masterIndex$TICKER, masterIndex$DATE_FILED, returns_calculator, interval_length = 14)
+returns_5_days <- map2_df(masterIndex$TICKER, masterIndex$DATE_FILED, returns_calculator)
 returns_1_month <- map2_df(masterIndex$TICKER, masterIndex$DATE_FILED, returns_calculator, interval_length = 1, interval_type = "month")
 returns_3_months <- map2_df(masterIndex$TICKER, masterIndex$DATE_FILED, returns_calculator, interval_length = 3, interval_type = "month")
 returns_6_months <- map2_df(masterIndex$TICKER, masterIndex$DATE_FILED, returns_calculator, interval_length = 6, interval_type = "month")
