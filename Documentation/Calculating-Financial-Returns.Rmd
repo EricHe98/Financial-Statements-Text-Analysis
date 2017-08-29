@@ -9,22 +9,35 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-http://blog.revolutionanalytics.com/2013/12/quantitative-finance-applications-in-r.html
-
 ```{r}
-library("quantmod")
 library("dplyr")
 library("lubridate")
 library("tidyr")
 ```
 
+Financial returns data was downloaded from the Center for Research in Security Prices (CRSP) daily stock returns database from the Wharton Research Data Services (WRDS) account. Data from 01/01/2000 to 12/31/2016 was downloaded; every single ticker and data category was downloaded, just in case. Date was selected to be in MM/DD/YYYY form.
+
+Market cap data was also downloaded from the CRSP database provided by WRDS, same beginning and end date, every single ticker and data category again. Date is in YYYYMMDD form.
+
 Load in the data.
 
 ```{r}
-tickers <- readLines("tickers.txt")
-full_returns <- read.csv("financialreturns.csv")
-full_returns <- data.frame(index = c(1:nrow(full_returns)), full_returns)
-ls(full_returns)
+masterIndex <- read.csv("masterIndex.csv")
+full_returns <- read.csv("trimmed_returns_raw.csv")
+full_cap <- read.csv("market_cap.csv") %>%
+  select(permno = PERMNO, num_shares = SHROUT, date = SHRSDT)
+```
+
+```{r}
+head(masterIndex)
+```
+
+```{r}
+head(full_returns)
+```
+
+```{r}
+head(full_cap)
 ```
 
 Select the relevant columns: holding period returns (RET), tickers (TICKER), company name (COMNAM), delisting return (DLRET), Shares Observation End Date (shrenddt)
@@ -32,18 +45,77 @@ Select the relevant columns: holding period returns (RET), tickers (TICKER), com
 End product: correct monthly returns
 
 ```{r}
-hpr <- select(full_returns, index = index, date = date, return = RET, ticker = TICKER, company_name = COMNAM, delisting_return = DLRET, end = SHRENDDT) %>%
-  filter(ticker %in% tickers) %>%
-  mutate(delisting_return = as.numeric(as.character(delisting_return))) %>%
-  mutate(delisting_return = replace(hpr$delisting_return, is.na(delisting_return) == TRUE, 0)) %>%
-  mutate(delisting_return = delisting_return + 1) %>%
-  mutate(return = as.numeric(as.character(return)) + 1) %>%
+full_returns <- select(full_returns, permno = PERMNO, date = date, return = RET, ticker = TICKER, delisting_return = DLRET) %>%
+  filter(ticker %in% masterIndex$TICKER) %>% # only need tickers for which we have filings to compare with
+  mutate(delisting_return = as.numeric(as.character(delisting_return))) %>% # 
+  mutate(delisting_return = replace(delisting_return, is.na(delisting_return) == TRUE, 0)) %>% # replace NA with 0
+  mutate(delisting_return = delisting_return + 1) %>% # so we can add 1 so we can multiply
+  mutate(return = as.numeric(as.character(return))) %>% # change return from factor to numeric, characters which CRSP uses to represent missing data or point towards delisting return gets changed to NA
+  mutate(return = replace(return, is.na(return) == TRUE, 0)) %>%
+  mutate(return = return + 1) %>%
   filter(is.na(return) == FALSE) %>%
   mutate(return = return * delisting_return) %>%
-  mutate(year = year(mdy(date)))
+  mutate(date = mdy(date)) %>%
+  select(-delisting_return)
 ```
 
-Calculate returns and arrange them by year.
+Given a ticker and a date from the master Index, devise a formula to calculate holding period returns for variable time intervals.
+
+```{r}
+the_ticker <- "AAPL"
+the_year <- 2013
+the_month <- 10
+the_day <- 30
+
+interval_length <- 3
+interval_type <- "month"
+
+start_date <- ymd("20131030")
+
+end_date <- the_date %m+% months(3)
+
+returns_calculator <- function(the_ticker, start_date, interval_length = 3, interval_type = "day"){
+  end_date <- start_date %>%
+    ymd %>% # have to ram through ymd again because map() uses [[]] which messes with lubridate object type
+    when(interval_type == "day" ~ . %m+% days(interval_length),
+         interval_type == "month" ~ . %m+% months(interval_length),
+         interval_type == "year" ~ . %m+% years(interval_length),
+         ~ stop(print(interval_type)))
+  date_sequence <- seq(ymd(start_date), end_date, by = "days") # see above comment
+  date_returns <- filter(full_returns, as.character(ticker) == as.character(the_ticker), date %in% date_sequence) # tickers must be converted to character or else throws a factor level error
+  if (nrow(date_returns) == 0){
+    empty_df <- data_frame(hpr = NA)
+    return(empty_df) # if no financial data then we would like to make that clear
+  } # when statement does not work to break the function! :(
+  hpr <-  summarise(date_returns, hpr = prod(return))
+  return(hpr)}
+```
+
+```{r}
+returns_3_days <- map2_df(masterIndex$TICKER, masterIndex$DATE_FILED, returns_calculator)
+returns_7_days <- map2_df(masterIndex$TICKER, masterIndex$DATE_FILED, returns_calculator, interval_length = 7)
+returns_14_days <- map2_df(masterIndex$TICKER, masterIndex$DATE_FILED, returns_calculator, interval_length = 14)
+returns_1_month <- map2_df(masterIndex$TICKER, masterIndex$DATE_FILED, returns_calculator, interval_length = 1, interval_type = "month")
+returns_3_months <- map2_df(masterIndex$TICKER, masterIndex$DATE_FILED, returns_calculator, interval_length = 3, interval_type = "month")
+returns_6_months <- map2_df(masterIndex$TICKER, masterIndex$DATE_FILED, returns_calculator, interval_length = 6, interval_type = "month")
+returns_1_year <- map2_df(masterIndex$TICKER, masterIndex$DATE_FILED, returns_calculator, interval_length = 1, interval_type = "year")
+```
+
+
+Treat the market cap data.
+
+```{r}
+full_cap <- mutate(full_cap, year = year(ymd(date)), month = month(ymd(date)), day = day(ymd(date)))
+```
+
+Join cap and returns data to calculate market cap.
+
+```{r}
+full_returns <- left_join(full_returns, full_cap, by = c("permno", "year", "month"))
+```
+
+
+Given a ticker and a date from the master Index, devise a formula to calculate holding period returns 
 
 ```{r}
 hpr1 <- group_by(hpr, ticker, year) %>%
