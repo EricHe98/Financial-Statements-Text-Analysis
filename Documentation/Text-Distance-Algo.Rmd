@@ -80,7 +80,7 @@ distance_returns_calculator <- function(the_ticker){
 file_names <- index_filing_filterer(the_ticker, masterIndex)
 
 if (length(file_names) <= 1){
-  empty_list <- map(rep(NA, times = length(sections)), ~data_frame(previous_filing = ., filing = ., distance = ., returns = .))
+  empty_list <- data_frame()
   print(paste("Only one filing available for ticker", the_ticker))
   return(empty_list)
 }
@@ -104,5 +104,5 @@ distance_df <- map(tickers, distance_returns_calculator) %>%
 
 masterIndex %<>% left_join(distance_df, by = "filing")
 
-write(masterIndex, "index_distance.csv")
+write.csv(masterIndex, file = "index_distance.csv")
 ```
