@@ -189,7 +189,7 @@ Item 3 discusses Legal Proceedings, and small companies with no legal proceeding
 
 Item 4 is a specific section about mine safety disclosures, which is not relevant for the majority of companies. 
 
-We cannot eliminate boiler plate language, especially not for legal proceedings, because changes from the boiler language is very important. For example, filing 67 by Jakks Pacific Inc. (JAKK) reports no relevant legal proceedings in its 2013-03-15 filing, but discusses a new lawsuit in its 2014-03-17 filing, leading to a relatively low similarity score of 0.3348315 between the two filings. A problem creating lots of false positives is the incorporation by reference issue discussed previously.
+We cannot eliminate boiler plate language, especially not for legal proceedings, because changes from the boiler language is very important. For example, filing 67 by Jakks Pacific Inc. (JAKK) reports no relevant legal proceedings in its 2013-03-15 filing, but discusses a new lawsuit in its 2014-03-17 filing, leading to a relatively low similarity score of 0.3348315 between the two filings. A problem creating lots of false positives is the incorporation by reference issue discussed previously. A possible solution for incorporation by reference would be to remove hits with less than x (250 according to McDonald) words and which contain variations of the phrase "incorporate by reference".
 
 High similarity scores are also seen in filings which use incorporation by reference, as discussed earlier.
 
