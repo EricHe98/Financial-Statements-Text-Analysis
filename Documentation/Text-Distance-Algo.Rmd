@@ -106,3 +106,91 @@ masterIndex %<>% left_join(distance_df, by = "filing")
 
 write.csv(masterIndex, file = "index_distance.csv")
 ```
+
+Summary statistics
+
+```{r}
+map(distance_df, summary)
+```
+
+```{r eval = FALSE}
+$previous_filing
+   Length     Class      Mode 
+    16001 character character 
+
+$filing
+   Length     Class      Mode 
+    16001 character character 
+
+$sec1dist
+   Min. 1st Qu.  Median    Mean 3rd Qu.    Max.    NA's 
+ 0.0368  0.8723  0.9239  0.8794  0.9555  1.0000     874 
+
+$sec1Adist
+   Min. 1st Qu.  Median    Mean 3rd Qu.    Max.    NA's 
+ 0.0593  0.9244  0.9568  0.9205  0.9768  1.0000    2224 
+
+$sec3dist
+   Min. 1st Qu.  Median    Mean 3rd Qu.    Max.    NA's 
+ 0.0281  0.7404  0.9529  0.8323  1.0000  1.0000    2675 
+
+$sec4dist
+   Min. 1st Qu.  Median    Mean 3rd Qu.    Max.    NA's 
+  0.074   0.909   0.917   0.905   0.954   1.000   10332 
+
+$sec7dist
+   Min. 1st Qu.  Median    Mean 3rd Qu.    Max.    NA's 
+ 0.0581  0.8157  0.8637  0.8229  0.8961  1.0000     927 
+
+$sec8dist
+   Min. 1st Qu.  Median    Mean 3rd Qu.    Max.    NA's 
+ 0.0535  0.8464  0.8846  0.8697  0.9568  1.0000    1286 
+
+$sec9dist
+   Min. 1st Qu.  Median    Mean 3rd Qu.    Max.    NA's 
+  0.077   0.909   0.973   0.892   1.000   1.000   14197 
+
+$sec9Adist
+   Min. 1st Qu.  Median    Mean 3rd Qu.    Max.    NA's 
+ 0.1617  0.9086  0.9711  0.9217  0.9834  1.0000    1338 
+```
+
+As expected, the majority of the master index's first year does not have any distance information.
+
+Many of the extremely distant filings (with distance scores less than 0.2) tend to be due to parsing errors. However, it is difficult to distinguish these from the relatively few, genuinely drastic changes which constitute highly relevant data.
+
+Filing 17468, filed by Sandisk Corp (SNDK) on 2016-02-12, had a parsing error in which several mentions of Item 3 in Item 1A were tagged as sections. The actual Item 3 referred to legal proceedings in its note, and had a low word count, allowing the longer, mistagged mentions of Item 3 to take precedence. Meanwhile, its previous filing, filing 11883 filed on 2015-02-10, was parsed correctly.
+
+The same is true of Items 1 and 7 in filings 11 and 6045, DISH Network Corp's (DISH) 2013-02-20 and 2014-02-21 filings, respectively. Item 1 is tagged 5 times each in both filings, and Item 7 is tagged a total of 33 times in the 2014 filing and 31 times in 2013!
+
+Another cause of low similarity scores is when the item is either not present, or the item is not tagged at all. Filing 6050, by Northwest Pipe Co (NWPX) in 2014-03-17, failed to tag Item 7 due to an HTML number/name wedged in between the 'I' and 'tem' in "Item 7" , while Northwest's other filings (filing 16, 2013-03-18, and filing 11899, 2015-03-16) contain it. Thus, the similarity scores for both filing 6050 and 11899 are extremely (and wrongly) very low.
+
+Still another cause of low similarity scores occurs when a company which has previously "incorporated by reference" the relevant text of the filing item by referring the reader to another document, decides to put the text directly into the filing the next year. Filing 11915, filed by PG&E (PCG) in 2015-02-10, has a similarity score of 0.1291636 with its predecessor, filing 9160 in 2014-02-11 for section 7. Here is the text of Item 7, filing 9160:
+
+"Management's Discussion and Analysis of Financial Condition and Results of Operations A discussion of PG E Corporation's and the Utility s consolidated financial condition and results of operations is set forth under the heading Management's Discussion and Analysis of Financial Condition and Results of Operations as well as the Glossary in the 2013 Annual Report, which **discussion is incorporated herein by reference**."
+
+However, the actual Item 7 text is present in filing 11915, with a total of 17103 words. Sections 1A and 8 of the filing also experience this change in reporting practice, leading to very low similarity scores for all 3 sections, even though the scores would probably be very high if we were able to look at the reference text.
+
+Extremely high similarity scores also raise some problems, although in general they are technically correct.
+
+Very high similarity scores on or about 1 represent no changes in the text between years. They tend to be boiler plate language. A common similarity score seen in the dataset is 0.9166667, which corresponds to having one change in word out of 12 words. For example, filings 42 and 6072 of United Continental Holdings (UAL) in Items 4:
+
+"°Item 4. MINE SAFETY DISCLOSURES. Not applicable. 28 Table of Contents PART II"
+
+"°Item 4. MINE SAFETY DISCLOSURES. Not applicable. 24 Table of Contents PART II"
+
+"Of", which is a stop word, is removed during the processing for a total of 12 words. The only difference is the the page numbers, 28 and 24. A solution would be to remove numbers during the distance analysis.
+
+This situation is very common for Items 3 and 4. 
+
+Item 3 discusses Legal Proceedings, and small companies with no legal proceedings generally have nothing to report here. For example, Oceanfirst Financial Corp (OCFC) had no legal proceedings to report in its 2015-03-13 and 2016-03-15 filings, filings 11913 and 17497, respectively. Here is the boiler plate:
+
+"°Item 3. Legal Proceedings The Company and the Bank are not involved in any pending legal proceedings other than routine legal proceedings occurring in the ordinary course of business. Such other routine legal proceedings in the aggregate are believed by management to be immaterial to the Company s financial condition or results of operations."
+
+Item 4 is a specific section about mine safety disclosures, which is not relevant for the majority of companies. 
+
+We cannot eliminate boiler plate language, especially not for legal proceedings, because changes from the boiler language is very important. For example, filing 67 by Jakks Pacific Inc. (JAKK) reports no relevant legal proceedings in its 2013-03-15 filing, but discusses a new lawsuit in its 2014-03-17 filing, leading to a relatively low similarity score of 0.3348315 between the two filings. A problem creating lots of false positives is the incorporation by reference issue discussed previously.
+
+High similarity scores are also seen in filings which use incorporation by reference, as discussed earlier.
+
+Another niche situation occurs when the company has filed more than one of the same report at the same time. This occurs when a company is a holding company, and its subsidiaries are required to file reports with the SEC as well. The oil and gas company, Pacific Gas and Electric, has a parent company called PG&E Corporation. They are both traded under the same ticker (PCG), but are identified by the SEC as two different entities and thus are identified twice. Thus, half the comparisons of the PG&E filings return the maximum similarity score of 1 for each section of the filing. Some holding companies have multiple subsidiaries, all filing the exact same report and all traded under the exact same ticker. Luckily, the SEC text file names for the reports are the same, allowing us to throw out file names which are duplicates during the preprocessing stage.
