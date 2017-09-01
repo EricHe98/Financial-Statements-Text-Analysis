@@ -1,0 +1,85 @@
+---
+title: "Calculating-NumProp-Returns"
+author: "Eric He"
+date: "August 28, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library("quanteda")
+library("dplyr")
+library("purrr")
+library("ggplot2")
+library("reshape2")
+library("gridExtra")
+```
+
+```{r}
+sections <- c("1", "1A", "1B", "2", "3", "4", "5", "6", "7", "7A", "8", "9", "9A", "9B", "10", "11", "12", "13", "14", "15")
+masterIndex <- read.csv("masterIndex.csv")
+```
+
+```{r}
+dfmstat_ratio <- function(dfmObj, dict){
+  dfm_select(dfmObj, features = dict) %>%
+    rowSums(.) / rowSums(dfmObj)
+}
+
+section_extractor <- function(statement, section){
+  name <- statement$doc_id 
+  pattern <- paste0("°Item ", section, "[^\\w|\\d]", ".*?°")
+  section_hits <- str_extract_all(statement, pattern, simplify=TRUE) 
+  if (is_empty(section_hits) == TRUE){
+    return("empty")
+  }
+  word_counts <- map_int(section_hits, ntoken)
+  max_hit <- which(word_counts == max(word_counts))
+  max_filing <- section_hits[[max_hit[length(max_hit)]]]
+ names(max_filing) <- paste(name, section, sep = "_") 
+  return(max_filing)
+}
+
+numeric_proportion_calculator <- function(text_obj){
+  dfm_obj <- corpus(text_obj) %>%
+    dfm(remove_punct = TRUE)
+  num_prop <- dfm_select(dfm_obj, pattern = "\\d+", valuetype = "regex") %>%
+    rowSums(.) / rowSums(dfm_obj)
+  big_name <- names(num_prop) # this is so cancer please find a better way to do this
+  filing_id <- str_extract(big_name, pattern = ".*?(?=\\.)")
+  section_number <- str_extract(big_name, pattern = "(?<=_).*")
+  matrified <- matrix(num_prop, dimnames = list(filing_id, section_number))
+  return(matrified)
+}
+
+file_location <- "parsed/1.txt"
+filing <- readtext(file_location)
+section_list <-  map(sections, section_extractor, statement = filing) %>%
+  map(numeric_proportion_calculator) %>%
+  reduce(cbind)
+
+file_locations <- paste0("parsed/", masterIndex$filing, ".txt")
+a <- map(file_locations, numeric_proportion_algorithm) %>%
+  reduce(rbind)
+
+numeric_proportion_algorithm <- function(file_location){
+  filing <- readtext(file_location)
+  section_list <-  map(sections, section_extractor, statement = filing) %>%
+  map(numeric_proportion_calculator) %>%
+  reduce(cbind)
+  print(paste("Successfully calculated for filing", file_location))
+  return(section_list)
+}
+
+
+dfm_select(dfmObj, pattern = "\\d+", valuetype = "regex") %>%
+  rowSums(.) / rowSums(dfmObj)
+
+#\\d+ includes things such as "300-millimeter", 10-k, 8-q, 3-dimensional, 1.51, etc. Quite flexible!
+```
+
+Differences with sentiment analysis: Don't remove stop words or numbers. No tfidf weighting.
+Similarities: Sample population is still by year.
