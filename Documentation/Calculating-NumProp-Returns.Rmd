@@ -21,6 +21,7 @@ library("gridExtra")
 ```{r}
 sections <- c("1", "1A", "1B", "2", "3", "4", "5", "6", "7", "7A", "8", "9", "9A", "9B", "10", "11", "12", "13", "14", "15")
 masterIndex <- read.csv("masterIndex.csv")
+masterIndex$filing <- as.character(masterIndex$filing)
 ```
 
 ```{r}
@@ -34,7 +35,9 @@ section_extractor <- function(statement, section){
   pattern <- paste0("°Item ", section, "[^\\w|\\d]", ".*?°")
   section_hits <- str_extract_all(statement, pattern, simplify=TRUE) 
   if (is_empty(section_hits) == TRUE){
-    return("empty")
+    empty_vec <- "empty"
+    names(empty_vec) <- paste(name, section, sep = "_") 
+    return(empty_vec)
   }
   word_counts <- map_int(section_hits, ntoken)
   max_hit <- which(word_counts == max(word_counts))
@@ -50,7 +53,7 @@ numeric_proportion_calculator <- function(text_obj){
     rowSums(.) / rowSums(dfm_obj)
   big_name <- names(num_prop) # this is so cancer please find a better way to do this
   filing_id <- str_extract(big_name, pattern = ".*?(?=\\.)")
-  section_number <- str_extract(big_name, pattern = "(?<=_).*")
+  section_number <- paste0("sec", str_extract(big_name, pattern = "(?<=_).*"), "num_prop")
   matrified <- matrix(num_prop, dimnames = list(filing_id, section_number))
   return(matrified)
 }
@@ -61,10 +64,6 @@ section_list <-  map(sections, section_extractor, statement = filing) %>%
   map(numeric_proportion_calculator) %>%
   reduce(cbind)
 
-file_locations <- paste0("parsed/", masterIndex$filing, ".txt")
-a <- map(file_locations, numeric_proportion_algorithm) %>%
-  reduce(rbind)
-
 numeric_proportion_algorithm <- function(file_location){
   filing <- readtext(file_location)
   section_list <-  map(sections, section_extractor, statement = filing) %>%
@@ -74,9 +73,18 @@ numeric_proportion_algorithm <- function(file_location){
   return(section_list)
 }
 
+file_locations <- paste0("parsed/", masterIndex$filing, ".txt")
+a <- map(file_locations, numeric_proportion_algorithm) %>%
+  reduce(rbind)
+a[a == 0] <- NA # no numbers found is impossible and only occurs during parse error
+rows <- rownames(a)
+b <- as_tibble(a)
+b <- cbind(filing = rows, b, stringsAsFactors = FALSE)
 
-dfm_select(dfmObj, pattern = "\\d+", valuetype = "regex") %>%
-  rowSums(.) / rowSums(dfmObj)
+masterIndex <- left_join(masterIndex, b, by = "filing")
+write.csv(masterIndex, file = "index_numprop.csv")
+
+
 
 #\\d+ includes things such as "300-millimeter", 10-k, 8-q, 3-dimensional, 1.51, etc. Quite flexible!
 ```
