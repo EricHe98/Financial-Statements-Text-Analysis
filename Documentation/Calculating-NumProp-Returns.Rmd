@@ -82,7 +82,7 @@ b <- as_tibble(a)
 b <- cbind(filing = rows, b, stringsAsFactors = FALSE)
 
 masterIndex <- left_join(masterIndex, b, by = "filing")
-write.csv(masterIndex, file = "index_numprop.csv")
+write.csv(masterIndex, file = "index_numprop.csv", row.names = FALSE)
 
 
 
