@@ -32,16 +32,23 @@ dfmstat_ratio <- function(dfmObj, dict){
 
 section_extractor <- function(statement, section){
   name <- statement$doc_id 
-  pattern <- paste0("°Item ", section, "[^\\w|\\d]", ".*?°")
+  pattern <- paste0("(?i)°Item ", section, "[^\\w|\\d]", ".*°")
   section_hits <- str_extract_all(statement, pattern, simplify=TRUE) 
   if (is_empty(section_hits) == TRUE){
     empty_vec <- "empty"
     names(empty_vec) <- paste(name, section, sep = "_") 
+    print(paste("No hits for section", section, "of filing", name))
     return(empty_vec)
   }
   word_counts <- map_int(section_hits, ntoken)
   max_hit <- which(word_counts == max(word_counts))
   max_filing <- section_hits[[max_hit[length(max_hit)]]]
+  if (max(word_counts) < 250 & str_detect(a, pattern = "(?i)(incorporated by reference)|(incorporated herein by reference)") == TRUE){
+    empty_vec <- "empty"
+    names(empty_vec) <- paste(name, section, sep = "_") 
+    print(paste("Section", section, "of filing", name, "incorporates by reference its information"))
+    return(empty_vec)
+  }
  names(max_filing) <- paste(name, section, sep = "_") 
   return(max_filing)
 }
