@@ -177,9 +177,9 @@ Extremely high similarity scores also raise some problems, although in general t
 
 Very high similarity scores on or about 1 represent no changes in the text between years. They tend to be boiler plate language. A common similarity score seen in the dataset is 0.9166667, which corresponds to having one change in word out of 12 words. For example, filings 42 and 6072 of United Continental Holdings (UAL) in Items 4:
 
-"Â°Item 4. MINE SAFETY DISCLOSURES. Not applicable. 28 Table of Contents PART II"
+"°Item 4. MINE SAFETY DISCLOSURES. Not applicable. 28 Table of Contents PART II"
 
-"Â°Item 4. MINE SAFETY DISCLOSURES. Not applicable. 24 Table of Contents PART II"
+"°Item 4. MINE SAFETY DISCLOSURES. Not applicable. 24 Table of Contents PART II"
 
 "Of", which is a stop word, is removed during the processing for a total of 12 words. The only difference is the the page numbers, 28 and 24. A solution would be to remove numbers during the distance analysis.
 
@@ -187,7 +187,7 @@ This situation is very common for Items 3 and 4.
 
 Item 3 discusses Legal Proceedings, and small companies with no legal proceedings generally have nothing to report here. For example, Oceanfirst Financial Corp (OCFC) had no legal proceedings to report in its 2015-03-13 and 2016-03-15 filings, filings 11913 and 17497, respectively. Here is the boiler plate:
 
-"Â°Item 3. Legal Proceedings The Company and the Bank are not involved in any pending legal proceedings other than routine legal proceedings occurring in the ordinary course of business. Such other routine legal proceedings in the aggregate are believed by management to be immaterial to the Company s financial condition or results of operations."
+"°Item 3. Legal Proceedings The Company and the Bank are not involved in any pending legal proceedings other than routine legal proceedings occurring in the ordinary course of business. Such other routine legal proceedings in the aggregate are believed by management to be immaterial to the Company s financial condition or results of operations."
 
 Item 4 is a specific section about mine safety disclosures, which is not relevant for the majority of companies. 
 
