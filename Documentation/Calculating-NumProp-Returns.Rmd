@@ -32,7 +32,7 @@ dfmstat_ratio <- function(dfmObj, dict){
 
 section_extractor <- function(statement, section){
   name <- statement$doc_id 
-  pattern <- paste0("Â°Item ", section, "[^\\w|\\d]", ".*?Â°")
+  pattern <- paste0("°Item ", section, "[^\\w|\\d]", ".*?°")
   section_hits <- str_extract_all(statement, pattern, simplify=TRUE) 
   if (is_empty(section_hits) == TRUE){
     empty_vec <- "empty"
