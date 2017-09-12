@@ -5,8 +5,8 @@ library("purrr")
 input <- "/data/edgar/data/"
 output <- "parsed-filings/"
 
-clean_filing <- function(file_name){
-  paste0(input, cik, file_name) %>%
+clean_filing <- function(file_name, input_cik){
+  paste0(input_cik, file_name) %>%
   readLines(encoding = "UTF-8") %>%
   str_c(collapse = " ") %>%
   str_extract(pattern = "(?s)(?m)<TYPE>10-Q.*?(</TEXT>)") %>%
@@ -32,7 +32,7 @@ clean_cik <- function(cik){
     list.files %>% 
     subset(str_detect(., pattern = "10-Q"))
   
-  map(files, clean_filing)
+  map(files, clean_filing, input_cik = input_cik)
   
   print(paste("Cleaned all filings for CIK", cik))  
 }
