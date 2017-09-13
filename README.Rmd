@@ -1,0 +1,32 @@
+---
+title: "Documentation"
+author: "Eric He"
+date: "September 12, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Summary
+--
+
+This repository hosts code for my text mining research project. In this project, I test for trading signals within the texts of quarterly and annual reports filed by publicly traded companies with the Securities Exchange Commission. Three potential features are tested:
+
+(Note: Documentation for each of these is incoming. However, a detailed explanation of the cosine distance calculation is given below).
+
+1) Sentiment analysis: A company's quarterly and annual reports provide updates on its current state and future goals. Is it possible that a company whose report contains a greater-than-average frequency of "negative" words (i.e. words associated with financial distress; for example, "sued", "losses", "adversity") tends to performs more poorly than companies with less negative words? What about positive words? Code for calculating sentiment scores is [here](https://github.com/EricHe98/Financial-Statements-Text-Analysis/blob/master/Documentation/Calculating-Sentiment-Returns.Rmd).
+
+2) Distance analysis: Changes in the texts of a company's quarterly and annual reports reflect changes in the company itself. Drastic changes in the company text, such as in the Legal Proceedings section, may be indicative of a troubled company; drastic changes in the Business section, where the company describes itself, may indicate a risky pivot. On the other hand, financial statements with very little edits may be indicative of inattentive management. Code for calculating distance scores is [here](https://github.com/EricHe98/Financial-Statements-Text-Analysis/blob/master/Documentation/Text-Distance-Algo.Rmd).
+
+3) Text-Numeric proportions analysis: Management facing poor financial numbers may decide to substitute them with words. Code for calculating numeric proportions is [here](https://github.com/EricHe98/Financial-Statements-Text-Analysis/blob/master/Documentation/Calculating-NumProp-Returns.Rmd).
+
+The raw data consists of raw HTML code, and requires a fairly intricate cleaning process derived from the [paper](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=2870309) "The Annual Report Algorithm" by Jorg Hering. A detailed walkthrough of cleaning a filing is in [here](https://github.com/EricHe98/Financial-Statements-Text-Analysis/blob/master/Documentation/Cleaning-Raw-Filings.md), and the script for cleaning all quarterly filings is [here](https://github.com/EricHe98/Financial-Statements-Text-Analysis/blob/master/Documentation/parsing-script.R). Even after cleaning, precautions must be taken when doing any analysis to correct for errors caused by poor formatting.
+
+Holding period returns of companies in the time periods after the date they file with the SEC were also calculated using daily returns data from [WRDS](http://www.whartonwrds.com/). The code for calculating normalized holding period returns is [here](https://github.com/EricHe98/Financial-Statements-Text-Analysis/blob/master/Documentation/Calculating-Financial-Returns.Rmd).
+
+A detailed walkthrough of the data, as well as the results of the analysis, is also incoming.
+
+
+
