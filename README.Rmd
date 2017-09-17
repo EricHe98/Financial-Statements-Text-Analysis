@@ -1,0 +1,51 @@
+---
+title: "Documentation"
+author: "Eric He"
+date: "September 12, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Summary
+--
+
+This repository hosts code for my text mining research project. In this project, I test for trading signals within the texts of quarterly and annual reports filed by publicly traded companies with the Securities Exchange Commission. Three potential features are tested:
+
+(Note: Documentation for each of these is incoming. However, a detailed explanation of the cosine distance calculation is given below).
+
+1) Sentiment analysis: A company's quarterly and annual reports provide updates on its current state and future goals. Is it possible that a company whose report contains a greater-than-average frequency of "negative" words (i.e. words associated with financial distress; for example, "sued", "losses", "adversity") tends to performs more poorly than companies with less negative words? What about positive words? Code for calculating sentiment scores is [here](https://github.com/EricHe98/Financial-Statements-Text-Analysis/blob/master/Documentation/Calculating-Sentiment-Returns.Rmd).
+
+2) Distance analysis: Changes in the texts of a company's quarterly and annual reports reflect changes in the company itself. Drastic changes in the company text, such as in the Legal Proceedings section, may be indicative of a troubled company; drastic changes in the Business section, where the company describes itself, may indicate a risky pivot. On the other hand, financial statements with very little edits may be indicative of inattentive management. Code for calculating distance scores is [here](https://github.com/EricHe98/Financial-Statements-Text-Analysis/blob/master/Documentation/Text-Distance-Algo.Rmd).
+
+3) Text-Numeric proportions analysis: Management facing poor financial numbers may decide to substitute them with words. Code for calculating numeric proportions is [here](https://github.com/EricHe98/Financial-Statements-Text-Analysis/blob/master/Documentation/Calculating-NumProp-Returns.Rmd).
+
+The raw data consists of raw HTML code, and requires a fairly intricate cleaning process derived from the [paper](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=2870309) "The Annual Report Algorithm" by Jorg Hering. Each section of the financial statement is tagged with a "°" degree symbol. A detailed walkthrough of cleaning a filing is in [here](https://github.com/EricHe98/Financial-Statements-Text-Analysis/blob/master/Documentation/Cleaning-Raw-Filings.md), and the script for cleaning all quarterly filings is [here](https://github.com/EricHe98/Financial-Statements-Text-Analysis/blob/master/Documentation/parsing-script.R). An example of a raw filing is the [Apple 2016 filing](https://www.sec.gov/Archives/edgar/data/320193/0001628280-16-020309.txt) on the SEC website. The [cleaned file](https://github.com/EricHe98/Financial-Statements-Text-Analysis/blob/master/Sample-Data/Apple-2016-Cleaned.txt) has been reduced from 12.8 MB to 285 KB. Even after cleaning, precautions must be taken when doing any analysis to correct for errors caused by poor formatting.
+
+Holding period returns of companies in the time periods after the date they file with the SEC were also calculated using daily returns data from [WRDS](http://www.whartonwrds.com/). The code for calculating normalized holding period returns is [here](https://github.com/EricHe98/Financial-Statements-Text-Analysis/blob/master/Documentation/Calculating-Financial-Returns.Rmd).
+
+A detailed walkthrough of the data, as well as the results of the analysis, is also incoming.
+
+Cosine Distance
+--
+
+Cosine distance scores are computed for sections 1 (Business), 1A (Risk Factors), 3 (Legal Proceedings), 4 (Mine Disclosures), 7 (Management's Discussion and Analysis of Financial Condition and Results of Operation), 8 (Financial Statement and Supplementary Data), 9 (Changes in and Disagreements with Accountants on Accounting and Financial Disclosure), and 9A (Controls and Procedures). 
+
+Cosine distance scores are calculated for each consecutive pair of filings, with respect to each section. To clarify, an example of the data is shown below.
+
+```{r eval = FALSE}
+  filing    CIK COMPANY_NAME FORM_TYPE DATE_FILED TICKER     ret5d previous_filing
+1   5844 320193    APPLE INC      10-K 2013-10-30   AAPL 0.9940992              NA
+2  11699 320193    APPLE INC      10-K 2014-10-27   AAPL 1.0302392            5844
+3  17314 320193    APPLE INC      10-K 2015-10-28   AAPL 1.0511802           11699
+4  22478 320193    APPLE INC      10-K 2016-10-26   AAPL 0.9650652           17314
+   sec1dist sec1Adist  sec3dist  sec4dist  sec7dist  sec8dist  sec9dist sec9Adist
+1        NA        NA        NA        NA        NA        NA        NA        NA
+2 0.9064846 0.9064806 0.9064250 0.9064187 0.9063563 0.9063064 0.9062936 0.9062513
+3 0.9043750 0.9043723 0.9043223 0.9043202 0.9042717 0.9042223 0.9042122 0.9042195
+4 0.9123101 0.9123075 0.9122643 0.9122607 0.9122010 0.9121568 0.9121410 0.9121136
+```
+
+For a given filing (e.g. filing 11699), we compare each of the selected sections with that of the previous filing. In the case of filing 11699, we compare with 5844. The cosine distance score lies between 0 and 1, with 0 meaning the two texts have nothing in common and 1 meaning the two texts have words appearing at the exact same relative frequencies. Calculating in this manner allows us to easily compare distance scores with forward returns starting from the date the statement was filed. As a result, the earliest filing of each company has no distance scores, since there is no earlier filing to compare it with.

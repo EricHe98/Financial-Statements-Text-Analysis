@@ -41,7 +41,8 @@ autoParse <- function(x){
   str_replace(pattern = "((?i)<DESCRIPTION>).*?(?=<)", replacement = "") %>%
   str_replace(pattern = "(?s)(?i)<head>.*?</head>", replacement = "") %>%
   str_replace(pattern = "(?s)(?i)<(table).*?(</table>)", replacement = "") %>%
-  str_replace_all(pattern = "(?s)(?i)(?m)> +Item|>Item|^Item", replacement = ">Â°Item") %>% # Step 7
+  str_replace_all(pattern = "(?s)(?i)(?m)> +Item|>Item|^Item", replacement = ">°Item") %>% # Step 7
+  str_replace(pattern = "</TEXT>", replacement = "°</TEXT>")
   str_replace_all(pattern = "(?s)<.*?>", replacement = " ") %>% # Step 8
   str_replace_all(pattern = "&(.{2,6});", replacement = " ") %>% # Step 9
   str_replace_all(pattern = "(?s) +", replacement = " ") %>% # Step 10
