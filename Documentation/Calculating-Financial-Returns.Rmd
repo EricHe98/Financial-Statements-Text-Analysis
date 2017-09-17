@@ -13,6 +13,7 @@ knitr::opts_chunk$set(echo = TRUE)
 library("dplyr")
 library("lubridate")
 library("tidyr")
+library("purrr")
 ```
 
 Financial returns data was downloaded from the Center for Research in Security Prices (CRSP) daily stock returns database from the Wharton Research Data Services (WRDS) account. Data from 01/01/2000 to 12/31/2016 was downloaded; every single ticker and data category was downloaded, just in case. Date was selected to be in MM/DD/YYYY form.
@@ -103,30 +104,31 @@ returns_6_months <- map2_df(masterIndex$TICKER, masterIndex$DATE_FILED, returns_
 returns_1_year <- map2_df(masterIndex$TICKER, masterIndex$DATE_FILED, returns_calculator, interval_length = 1, interval_type = "year")
 ```
 
-
-Treat the market cap data.
-
-```{r}
-full_cap <- mutate(full_cap, year = year(ymd(date)), month = month(ymd(date)), day = day(ymd(date)))
-```
-
-Join cap and returns data to calculate market cap.
+The volatility calculator uses the original trimmed raw returns data to calculate, since it is more accurate about which days are trading days!
 
 ```{r}
-full_returns <- left_join(full_returns, full_cap, by = c("permno", "year", "month"))
+volatility_calculator <- function(the_ticker, filing_date, interval_length = 1, interval_type = "year"){
+  end_date <- filing_date %>% ymd
+  start_date <- end_date %>%
+    ymd %>%
+    when(interval_type == "day" ~ . %m-% days(interval_length),
+         interval_type == "month" ~ . %m-% months(interval_length), 
+         interval_type == "year" ~ . %m-% years(interval_length),
+         ~ stop(print(interval_type)))
+  date_sequence <- seq(start_date, end_date, by = "days")
+  date_sequence <- date_sequence[-which(format(date_sequence, "%u") %in% c(6,7))]
+  date_returns <- filter(full_returns, as.character(ticker) == as.character(the_ticker), date %in% date_sequence)
+  if (nrow(date_returns) == 0){
+    empty_df <- data_frame(sd = NA)
+    print(paste("No financial data for ticker", the_ticker))
+    return(empty_df) 
+  }
+  volatility <-  summarise(date_returns, sd = sd(return))
+}
 ```
-
-
-Given a ticker and a date from the master Index, devise a formula to calculate holding period returns 
 
 ```{r}
-hpr1 <- group_by(hpr, ticker, year) %>%
-  summarise(cumulative_return = prod(return)) %>%
-  spread(year, cumulative_return)
+masterIndex <- cbind(masterIndex, ret5d = returns_5_days$hpr, ret1m = returns_1_month$hpr, ret3m = returns_3_months$hpr,  ret6m = returns_6_months$hpr, ret1y = returns_1_year$hpr)
+write.csv(masterIndex, "masterIndex.csv", row.names = FALSE)
 ```
 
-Save hpr1
-
-```{r}
-write.csv(hpr1, "annualReturns.csv", row.names = FALSE)
-```
