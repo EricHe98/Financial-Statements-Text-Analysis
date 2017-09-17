@@ -43,7 +43,7 @@ section_extractor <- function(statement, section){
   word_counts <- map_int(section_hits, ntoken)
   max_hit <- which(word_counts == max(word_counts))
   max_filing <- section_hits[[max_hit[length(max_hit)]]]
-  if (max(word_counts) < 250 & str_detect(a, pattern = "(?i)(incorporated by reference)|(incorporated herein by reference)") == TRUE){
+  if (max(word_counts) < 250 & str_detect(max_filing, pattern = "(?i)(incorporated by reference)|(incorporated herein by reference)") == TRUE){
     empty_vec <- "empty"
     names(empty_vec) <- paste(name, section, sep = "_") 
     print(paste("Section", section, "of filing", name, "incorporates by reference its information"))
