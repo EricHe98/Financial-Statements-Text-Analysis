@@ -145,6 +145,8 @@ negative_sentiment <- map(years, sentiment_returns_algo, sentiment_dict = negati
   flatten %>%
   reduce(append)
 
+#TODO: clean up this cancer code
+
 names <- negative_sentiment %>% names %>%
   str_extract(pattern = ".*?(?=\\.)")
 
