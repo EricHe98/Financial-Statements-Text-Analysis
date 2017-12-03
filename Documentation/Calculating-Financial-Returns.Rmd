@@ -23,8 +23,8 @@ Market cap data was also downloaded from the CRSP database provided by WRDS, sam
 Load in the data.
 
 ```{r}
-masterIndex <- read.csv("masterIndex.csv")
-full_returns <- read.csv("trimmed_returns_raw.csv")
+master_index <- read.csv("masterIndex.csv")
+full_returns <- read.csv("../Data/Financial Data/Trimmed_Returns_Raw.csv")
 full_cap <- read.csv("market_cap.csv") %>%
   select(permno = PERMNO, num_shares = SHROUT, date = SHRSDT)
 ```
@@ -46,8 +46,8 @@ Select the relevant columns: holding period returns (RET), tickers (TICKER), com
 End product: correct monthly returns
 
 ```{r}
-full_returns <- select(full_returns, permno = PERMNO, date = date, return = RET, ticker = TICKER, delisting_return = DLRET) %>%
-  filter(ticker %in% masterIndex$TICKER) %>% # only need tickers for which we have filings to compare with
+full_returns <- select(full_returns, permco = PERMCO, date = date, return = RET, ticker = TICKER, delisting_return = DLRET) %>%
+  filter(ticker %in% master_index$TICKER) %>% # only need tickers for which we have filings to compare with
   mutate(delisting_return = as.numeric(as.character(delisting_return))) %>% # 
   mutate(delisting_return = replace(delisting_return, is.na(delisting_return) == TRUE, 0)) %>% # replace NA with 0
   mutate(delisting_return = delisting_return + 1) %>% # so we can add 1 so we can multiply
@@ -90,9 +90,11 @@ returns_calculator <- function(the_ticker, filing_date, interval_length = 5, int
   date_returns <- filter(full_returns, as.character(ticker) == as.character(the_ticker), date %in% date_sequence) # tickers must be converted to character or else throws a factor level error
   if (nrow(date_returns) == 0){
     empty_df <- data_frame(hpr = NA)
+    print(paste("No financial data for ticker", the_ticker))
     return(empty_df) # if no financial data then we would like to make that clear
   } # when statement does not work to break the function! :(
   hpr <-  summarise(date_returns, hpr = prod(return))
+  print(paste("Calculated hpr for ticker", the_ticker, "and date", filing_date))
   return(hpr)}
 ```
 
@@ -124,11 +126,27 @@ volatility_calculator <- function(the_ticker, filing_date, interval_length = 1, 
     return(empty_df) 
   }
   volatility <-  summarise(date_returns, sd = sd(return))
+  print(paste("Calculated volatility for ticker", the_ticker, "and date", filing_date))
+  return(volatility)
 }
 ```
 
 ```{r}
+vol_1year <- map2_df(master_index$TICKER, master_index$DATE_FILED, volatility_calculator)
+```
+
+```{r}
+master_index <- cbind(master_index, vol_1year)
+master_index %<>% mutate(
+  adj_ret5d = ret5d / (sqrt(5) * sd),
+  adj_ret1m = ret1m / (sqrt(30) * sd),
+  adj_ret3m = ret3m / (sqrt(90) * sd),
+  adj_ret1y = ret1y / (sqrt(365) * sd)
+)
+```
+
+```{r}
 masterIndex <- cbind(masterIndex, ret5d = returns_5_days$hpr, ret1m = returns_1_month$hpr, ret3m = returns_3_months$hpr,  ret6m = returns_6_months$hpr, ret1y = returns_1_year$hpr)
-write.csv(masterIndex, "masterIndex.csv", row.names = FALSE)
+write.csv(master_index, "../Data/Master Index/masterIndex.csv", row.names = FALSE)
 ```
 
